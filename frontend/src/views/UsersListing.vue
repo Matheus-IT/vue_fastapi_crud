@@ -166,8 +166,22 @@ const editUser = (user) => {
     console.log('Edit user:', user)
 }
 
-const deleteUser = (user) => {
-    console.log('Delete user:', user)
+const deleteUser = async (user) => {
+  const confirmDelete = confirm(`Are you sure you want to delete ${user.username}?`)
+  if (!confirmDelete) return
+
+  try {
+    await axios.delete(`http://localhost:5000/users/${user._id}`)
+    // Optimistically remove the user from the list
+    users.value = users.value.filter(u => u._id !== user._id)
+    alert('User deleted successfully')
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    alert(`Error deleting user: ${error.response?.data?.error || error.message}`)
+    
+    // Refresh the list if there was an error to ensure consistency
+    await fetchUsers()
+  }
 }
 
 onMounted(() => {
