@@ -92,9 +92,10 @@ const editUser = (user) => {
 
 const handleFormSubmit = async (formData) => {
     try {
+        // Remove the _id field from the formData
+        const { _id, ...payload } = formData
+        
         if (isEditMode.value) {
-            // Remove the _id field from the formData
-            const { _id, ...payload } = formData
             console.log('Updating user:', formData)
             await axios.put(`http://localhost:5000/users/${selectedUser.value._id}`, payload)
         } else {
