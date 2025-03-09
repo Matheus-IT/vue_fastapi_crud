@@ -2,9 +2,14 @@
     <v-container>
         <v-card>
             <v-card-title class="d-flex justify-space-between align-center">
-                <span class="text-h5">User Details</span>
                 <div>
-                    <v-btn color="primary" @click="openEditDialog" class="mr-2">
+                    <v-btn icon @click="goBack" class="mr-2">
+                        <v-icon>mdi-arrow-left</v-icon>
+                    </v-btn>
+                    <span class="text-h5">User Details</span>
+                </div>
+                <div>
+                    <v-btn color="primary" @click="openEditDialog(user)" class="mr-2">
                         <v-icon left>mdi-pencil</v-icon>
                         Edit
                     </v-btn>
@@ -90,7 +95,7 @@ const fetchUser = async () => {
     try {
         const response = await axios.get(`http://localhost:5000/users/${route.params.user_id}`)
         console.log('response', response);
-        
+
         user.value = response.data
     } catch (error) {
         console.error('Error fetching user:', error)
@@ -98,22 +103,25 @@ const fetchUser = async () => {
     }
 }
 
-const openEditDialog = () => {
+const openEditDialog = (user) => {
+    const confirmEdit = confirm(`Are you sure you want to edit ${user.username}?`)
+    if (!confirmEdit) return
+
     showEditDialog.value = true
 }
 
 const handleEditSubmit = async (formData) => {
-  try {
-    // Remove the _id field from the formData
-    const { _id, ...updateData } = formData
+    try {
+        // Remove the _id field from the formData
+        const { _id, ...updateData } = formData
 
-    await axios.put(`http://localhost:5000/users/${route.params.user_id}`, updateData)
-    showEditDialog.value = false
-    await fetchUser() // Refresh the user data
-  } catch (error) {
-    console.error('Error updating user:', error)
-    alert(`Error updating user: ${error.response?.data?.error || error.message}`)
-  }
+        await axios.put(`http://localhost:5000/users/${route.params.user_id}`, updateData)
+        showEditDialog.value = false
+        await fetchUser() // Refresh the user data
+    } catch (error) {
+        console.error('Error updating user:', error)
+        alert(`Error updating user: ${error.response?.data?.error || error.message}`)
+    }
 }
 
 const deleteUser = async () => {
@@ -128,6 +136,10 @@ const deleteUser = async () => {
         console.error('Error deleting user:', error)
         alert(`Error deleting user: ${error.response?.data?.error || error.message}`)
     }
+}
+
+const goBack = () => {
+    router.go(-1) // Go back to the previous page
 }
 
 onMounted(() => {

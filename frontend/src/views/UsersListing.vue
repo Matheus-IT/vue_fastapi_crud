@@ -81,6 +81,9 @@ const openCreateDialog = () => {
 }
 
 const editUser = (user) => {
+    const confirmEdit = confirm(`Are you sure you want to edit ${user.username}?`)
+    if (!confirmEdit) return
+
     console.log('Opening edit dialog for user:', user)
     isEditMode.value = true
     selectedUser.value = { ...user }
