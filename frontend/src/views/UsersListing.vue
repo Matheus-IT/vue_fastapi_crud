@@ -93,11 +93,13 @@ const editUser = (user) => {
 const handleFormSubmit = async (formData) => {
     try {
         if (isEditMode.value) {
+            // Remove the _id field from the formData
+            const { _id, ...payload } = formData
             console.log('Updating user:', formData)
-            await axios.put(`http://localhost:5000/users/${selectedUser.value._id}`, formData)
+            await axios.put(`http://localhost:5000/users/${selectedUser.value._id}`, payload)
         } else {
-            console.log('Creating user:', formData)
-            await axios.post('http://localhost:5000/users', formData)
+            console.log('Creating user:', payload)
+            await axios.post('http://localhost:5000/users', payload)
         }
         showUserDialog.value = false
         await fetchUsers() // Refresh the list
