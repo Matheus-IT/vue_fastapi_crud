@@ -9,12 +9,40 @@ services:
       - mongo_data:/data/db
 
   importer:
-    build: .
+    build:
+      context: .
+      dockerfile: ./Dockerfile.importer
     container_name: importer
     depends_on:
       - mongo
     volumes:
       - .:/app
+  
+  backend:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.backend
+    container_name: flask-api
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/mydatabase
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.frontend
+    container_name: vue-app
+    ports:
+      - "5173:5173"
+    # depends_on:
+    #   - backend
+    volumes:
+      - ./frontend:/app
 
 volumes:
   mongo_data:
