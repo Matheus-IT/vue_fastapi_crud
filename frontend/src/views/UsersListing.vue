@@ -3,47 +3,14 @@
         <v-card>
             <v-card-title class="d-flex justify-space-between align-center">
                 <span class="text-h5">Users Management</span>
-                <v-btn color="primary" @click="showCreateDialog = true">
+                <v-btn color="primary" @click="openCreateDialog()">
                     <v-icon left>mdi-plus</v-icon>
                     Create User
                 </v-btn>
             </v-card-title>
 
-            <v-dialog v-model="showCreateDialog" max-width="600">
-                <v-card>
-                    <v-card-title class="text-h5">Create New User</v-card-title>
-                    <v-card-text>
-                        <v-form ref="createForm" @submit.prevent="handleCreateUser">
-                            <v-text-field v-model="newUser.username" label="Username" :rules="[required]"
-                                required></v-text-field>
-
-                            <v-text-field v-model="newUser.password" label="Password" type="password"
-                                :rules="[required, passwordStrength]" required></v-text-field>
-
-                            <v-select v-model="newUser.preferences.timezone" :items="timezones" label="Timezone"
-                                :rules="[required]" required></v-select>
-
-                            <v-checkbox v-model="newUser.roles" label="Admin" value="admin"></v-checkbox>
-
-                            <v-checkbox v-model="newUser.roles" label="Manager" value="manager"></v-checkbox>
-
-                            <v-checkbox v-model="newUser.roles" label="Tester" value="tester"></v-checkbox>
-
-                            <v-switch v-model="newUser.active" label="Active" color="success" inset></v-switch>
-
-                            <v-card-actions>
-                                <v-spacer></v-spacer>
-                                <v-btn color="error" @click="showCreateDialog = false">
-                                    Cancel
-                                </v-btn>
-                                <v-btn color="primary" type="submit">
-                                    Create
-                                </v-btn>
-                            </v-card-actions>
-                        </v-form>
-                    </v-card-text>
-                </v-card>
-            </v-dialog>
+            <UserFormDialog :dialog="showUserDialog" @update:dialog="showUserDialog = $event" :isEdit="isEditMode"
+                :userData="selectedUser" @submit="handleFormSubmit" />
 
             <v-data-table :headers="headers" :items="users" :loading="loading" loading-text="Loading users...">
                 <template v-slot:item.username="{ item }">
@@ -88,7 +55,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { format } from 'date-fns'
+import UserFormDialog from '@/components/UserFormDialog.vue'
 
 const headers = ref([
     { title: 'Username', key: 'username' },
@@ -102,36 +69,45 @@ const headers = ref([
 
 const users = ref([])
 const loading = ref(true)
-const showCreateDialog = ref(false)
-const createForm = ref(null)
+const showUserDialog = ref(false)
+const isEditMode = ref(false)
+const selectedUser = ref(null)
 
-const timezones = ref([
-    'America/New_York',
-    'Europe/London',
-    'Asia/Tokyo',
-    'Europe/Paris',
-    'Australia/Sydney'
-])
+const openCreateDialog = () => {
+    console.log('Opening create dialog')
+    isEditMode.value = false
+    selectedUser.value = null
+    showUserDialog.value = true
+}
 
-const newUser = ref({
-    username: '',
-    password: '',
-    roles: [],
-    preferences: {
-        timezone: ''
-    },
-    active: true
-})
+const editUser = (user) => {
+    console.log('Opening edit dialog for user:', user)
+    isEditMode.value = true
+    selectedUser.value = { ...user }
+    showUserDialog.value = true
+}
 
-const required = (value) => !!value || 'This field is required'
-
-const passwordStrength = (value) =>
-    (value && value.length >= 8) || 'Password must be at least 8 characters'
+const handleFormSubmit = async (formData) => {
+    try {
+        if (isEditMode.value) {
+            console.log('Updating user:', formData)
+            await axios.put(`http://localhost:5000/users/${selectedUser.value._id}`, formData)
+        } else {
+            console.log('Creating user:', formData)
+            await axios.post('http://localhost:5000/users', formData)
+        }
+        showUserDialog.value = false
+        await fetchUsers() // Refresh the list
+    } catch (error) {
+        console.error('Error saving user:', error)
+        alert(`Error saving user: ${error.response?.data?.error || error.message}`)
+    }
+}
 
 const fetchUsers = async () => {
     try {
         const response = await axios.get('http://localhost:5000/users')
-        console.log('response', response)
+        console.log('Fetched users:', response.data)
         users.value = response.data
     } catch (error) {
         console.error('Error fetching users:', error)
@@ -140,48 +116,19 @@ const fetchUsers = async () => {
     }
 }
 
-const handleCreateUser = async () => {
-    const { valid } = await createForm.value.validate()
-    if (!valid) return
+const deleteUser = async (user) => {
+    const confirmDelete = confirm(`Are you sure you want to delete ${user.username}?`)
+    if (!confirmDelete) return
 
     try {
-        const res = await axios.post('http://localhost:5000/users', newUser.value)
-        console.log('res created', res);
-        showCreateDialog.value = false
-        newUser.value = {
-            username: '',
-            password: '',
-            roles: [],
-            preferences: { timezone: '' },
-            active: true
-        }
-        await fetchUsers() // Refresh the list
+        await axios.delete(`http://localhost:5000/users/${user._id}`)
+        users.value = users.value.filter(u => u._id !== user._id)
+        alert('User deleted successfully')
     } catch (error) {
-        console.error('Error creating user:', error)
-        alert('Error creating user: ' + error.response?.data?.error || error.message)
+        console.error('Error deleting user:', error)
+        alert(`Error deleting user: ${error.response?.data?.error || error.message}`)
+        await fetchUsers()
     }
-}
-
-const editUser = (user) => {
-    console.log('Edit user:', user)
-}
-
-const deleteUser = async (user) => {
-  const confirmDelete = confirm(`Are you sure you want to delete ${user.username}?`)
-  if (!confirmDelete) return
-
-  try {
-    await axios.delete(`http://localhost:5000/users/${user._id}`)
-    // Optimistically remove the user from the list
-    users.value = users.value.filter(u => u._id !== user._id)
-    alert('User deleted successfully')
-  } catch (error) {
-    console.error('Error deleting user:', error)
-    alert(`Error deleting user: ${error.response?.data?.error || error.message}`)
-    
-    // Refresh the list if there was an error to ensure consistency
-    await fetchUsers()
-  }
 }
 
 onMounted(() => {

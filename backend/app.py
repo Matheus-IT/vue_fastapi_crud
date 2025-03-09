@@ -75,13 +75,31 @@ def create_user():
 @app.route("/users/<user_id>", methods=["PUT"])
 def update_user(user_id):
     data = request.get_json()
+    
+    # Validate required fields
+    if not data.get('username'):
+        return jsonify({"error": "Username is required"}), 400
+        
+    # Validate roles
+    valid_roles = {'admin', 'manager', 'tester'}
+    if any(role not in valid_roles for role in data.get('roles', [])):
+        return jsonify({"error": "Invalid role specified"}), 400
+
+    # Update last updated timestamp
     data["last_updated_ts"] = datetime.datetime.utcnow().timestamp()
-    result = users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": data})
-    if result.modified_count:
-        user = users_collection.find_one({"_id": ObjectId(user_id)})
-        user["_id"] = str(user["_id"])
-        return jsonify(user), 200
-    return jsonify({"error": "User not found or no changes made"}), 404
+    
+    try:
+        result = users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": data}
+        )
+        if result.modified_count:
+            updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
+            updated_user["_id"] = str(updated_user["_id"])
+            return jsonify(updated_user), 200
+        return jsonify({"error": "User not found or no changes made"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/users/<user_id>", methods=["DELETE"])
 def delete_user(user_id):
