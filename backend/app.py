@@ -14,6 +14,13 @@ client = MongoClient(MONGO_URI)
 db = client["mydatabase"]
 users_collection = db["users"]
 
+def convert_timestamps_to_iso(user):
+    from datetime import datetime
+    user['created_at'] = datetime.fromtimestamp(user['created_ts']).isoformat()
+    user['last_updated'] = datetime.fromtimestamp(user.get('updated_ts', user['created_ts'])).isoformat()
+    return user
+
+
 @app.route("/", methods=["GET"])
 def home():
     return {'message': 'Backend is working!'}
@@ -23,6 +30,7 @@ def get_users():
     users = []
     for user in users_collection.find():
         user["_id"] = str(user["_id"])
+        user = convert_timestamps_to_iso(user)
         users.append(user)
     return jsonify(users), 200
 
@@ -31,6 +39,7 @@ def get_user(user_id):
     user = users_collection.find_one({"_id": ObjectId(user_id)})
     if user:
         user["_id"] = str(user["_id"])
+        user = convert_timestamps_to_iso(user)
         return jsonify(user), 200
     return jsonify({"error": "User not found"}), 404
 

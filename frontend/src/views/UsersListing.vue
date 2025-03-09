@@ -2,7 +2,14 @@
     <v-container>
         <v-card>
             <v-card-title class="text-h5">Users Management</v-card-title>
+
             <v-data-table :headers="headers" :items="users" :loading="loading" loading-text="Loading users...">
+                <template v-slot:item.username="{ item }">
+                    <router-link :to="`/users/${item._id}`" class="text-decoration-none text-primary">
+                        {{ item.username }}
+                    </router-link>
+                </template>
+
                 <template v-slot:item.roles="{ item }">
                     <v-chip v-for="role in item.roles" :key="role" class="ma-1" color="primary" size="small">
                         {{ role }}
@@ -19,8 +26,8 @@
                     </v-icon>
                 </template>
 
-                <template v-slot:item.created_ts="{ item }">
-                    {{ formatDate(item.created_ts) }}
+                <template v-slot:item.created_at="{ item }">
+                    {{ item.created_at }}
                 </template>
 
                 <template v-slot:item.actions="{ item }">
@@ -46,7 +53,7 @@ const headers = ref([
     { title: 'Roles', key: 'roles' },
     { title: 'Timezone', key: 'preferences.timezone' },
     { title: 'Is Active?', key: 'active' },
-    { title: 'Created At', key: 'created_ts' },
+    { title: 'Created At', key: 'created_at' },
     { title: 'Last Updated', key: 'last_updated' },
     { title: 'Actions', key: 'actions', sortable: false }
 ])
@@ -54,15 +61,10 @@ const headers = ref([
 const users = ref([])
 const loading = ref(true)
 
-const formatDate = (timestamp) => {
-    return format(new Date(timestamp * 1000), 'yyyy-MM-dd HH:mm')
-}
-
 const fetchUsers = async () => {
     try {
         const response = await axios.get('http://localhost:5000/users')
-        console.log('response', response);
-        
+        console.log('response', response)
         users.value = response.data
     } catch (error) {
         console.error('Error fetching users:', error)
@@ -72,12 +74,10 @@ const fetchUsers = async () => {
 }
 
 const editUser = (user) => {
-    // TODO: Implement edit functionality
     console.log('Edit user:', user)
 }
 
 const deleteUser = (user) => {
-    // TODO: Implement delete functionality
     console.log('Delete user:', user)
 }
 
