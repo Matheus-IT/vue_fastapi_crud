@@ -36,7 +36,11 @@
                 </template>
 
                 <template v-slot:item.created_at="{ item }">
-                    {{ item.created_at }}
+                    {{ formatDateTime(item.created_at) }}
+                </template>
+                
+                <template v-slot:item.last_updated="{ item }">
+                    {{ formatDateTime(item.last_updated) }}
                 </template>
 
                 <template v-slot:item.actions="{ item }">
@@ -56,6 +60,19 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import UserFormDialog from '@/components/UserFormDialog.vue'
+
+const formatDateTime = (dateTimeString) => {
+  const date = new Date(dateTimeString);
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true, // Use 12-hour format (AM/PM)
+  });
+};
 
 const headers = ref([
     { title: 'Username', key: 'username' },
@@ -94,7 +111,7 @@ const handleFormSubmit = async (formData) => {
     try {
         // Remove the _id field from the formData
         const { _id, ...payload } = formData
-        
+
         if (isEditMode.value) {
             console.log('Updating user:', formData)
             await axios.put(`http://localhost:5000/users/${selectedUser.value._id}`, payload)
