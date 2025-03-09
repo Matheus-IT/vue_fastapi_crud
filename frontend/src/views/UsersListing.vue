@@ -1,7 +1,7 @@
 <template>
     <v-container>
         <v-card>
-            <v-card-title class="d-flex justify-space-between align-center">
+            <v-card-title class="d-flex justify-space-between align-center ">
                 <span class="text-h5">Users Management</span>
                 <v-btn color="primary" @click="openCreateDialog()">
                     <v-icon left>mdi-plus</v-icon>

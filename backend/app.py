@@ -34,15 +34,6 @@ def get_users():
         users.append(user)
     return jsonify(users), 200
 
-@app.route("/users/<user_id>", methods=["GET"])
-def get_user(user_id):
-    user = users_collection.find_one({"_id": ObjectId(user_id)})
-    if user:
-        user["_id"] = str(user["_id"])
-        user = convert_timestamps_to_iso(user)
-        return jsonify(user), 200
-    return jsonify({"error": "User not found"}), 404
-
 @app.route("/users", methods=["POST"])
 def create_user():
     data = request.get_json()
@@ -72,34 +63,29 @@ def create_user():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+@app.route("/users/<user_id>", methods=["GET"])
+def get_user(user_id):
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if user:
+        user["_id"] = str(user["_id"])
+        user = convert_timestamps_to_iso(user)
+        return jsonify(user), 200
+    return jsonify({"error": "User not found"}), 404
+
 @app.route("/users/<user_id>", methods=["PUT"])
 def update_user(user_id):
     data = request.get_json()
-    
-    # Validate required fields
-    if not data.get('username'):
-        return jsonify({"error": "Username is required"}), 400
-        
-    # Validate roles
-    valid_roles = {'admin', 'manager', 'tester'}
-    if any(role not in valid_roles for role in data.get('roles', [])):
-        return jsonify({"error": "Invalid role specified"}), 400
-
-    # Update last updated timestamp
     data["last_updated_ts"] = datetime.datetime.utcnow().timestamp()
-    
-    try:
-        result = users_collection.update_one(
-            {"_id": ObjectId(user_id)},
-            {"$set": data}
-        )
-        if result.modified_count:
-            updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
-            updated_user["_id"] = str(updated_user["_id"])
-            return jsonify(updated_user), 200
-        return jsonify({"error": "User not found or no changes made"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    result = users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": data}
+    )
+    if result.modified_count:
+        updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
+        updated_user["_id"] = str(updated_user["_id"])
+        updated_user = convert_timestamps_to_iso(updated_user)
+        return jsonify(updated_user), 200
+    return jsonify({"error": "User not found or no changes made"}), 404
 
 @app.route("/users/<user_id>", methods=["DELETE"])
 def delete_user(user_id):
