@@ -1,7 +1,49 @@
 <template>
     <v-container>
         <v-card>
-            <v-card-title class="text-h5">Users Management</v-card-title>
+            <v-card-title class="d-flex justify-space-between align-center">
+                <span class="text-h5">Users Management</span>
+                <v-btn color="primary" @click="showCreateDialog = true">
+                    <v-icon left>mdi-plus</v-icon>
+                    Create User
+                </v-btn>
+            </v-card-title>
+
+            <v-dialog v-model="showCreateDialog" max-width="600">
+                <v-card>
+                    <v-card-title class="text-h5">Create New User</v-card-title>
+                    <v-card-text>
+                        <v-form ref="createForm" @submit.prevent="handleCreateUser">
+                            <v-text-field v-model="newUser.username" label="Username" :rules="[required]"
+                                required></v-text-field>
+
+                            <v-text-field v-model="newUser.password" label="Password" type="password"
+                                :rules="[required, passwordStrength]" required></v-text-field>
+
+                            <v-select v-model="newUser.preferences.timezone" :items="timezones" label="Timezone"
+                                :rules="[required]" required></v-select>
+
+                            <v-checkbox v-model="newUser.roles" label="Admin" value="admin"></v-checkbox>
+
+                            <v-checkbox v-model="newUser.roles" label="Manager" value="manager"></v-checkbox>
+
+                            <v-checkbox v-model="newUser.roles" label="Tester" value="tester"></v-checkbox>
+
+                            <v-switch v-model="newUser.active" label="Active" color="success" inset></v-switch>
+
+                            <v-card-actions>
+                                <v-spacer></v-spacer>
+                                <v-btn color="error" @click="showCreateDialog = false">
+                                    Cancel
+                                </v-btn>
+                                <v-btn color="primary" type="submit">
+                                    Create
+                                </v-btn>
+                            </v-card-actions>
+                        </v-form>
+                    </v-card-text>
+                </v-card>
+            </v-dialog>
 
             <v-data-table :headers="headers" :items="users" :loading="loading" loading-text="Loading users...">
                 <template v-slot:item.username="{ item }">
@@ -60,6 +102,31 @@ const headers = ref([
 
 const users = ref([])
 const loading = ref(true)
+const showCreateDialog = ref(false)
+const createForm = ref(null)
+
+const timezones = ref([
+    'America/New_York',
+    'Europe/London',
+    'Asia/Tokyo',
+    'Europe/Paris',
+    'Australia/Sydney'
+])
+
+const newUser = ref({
+    username: '',
+    password: '',
+    roles: [],
+    preferences: {
+        timezone: ''
+    },
+    active: true
+})
+
+const required = (value) => !!value || 'This field is required'
+
+const passwordStrength = (value) =>
+    (value && value.length >= 8) || 'Password must be at least 8 characters'
 
 const fetchUsers = async () => {
     try {
@@ -70,6 +137,28 @@ const fetchUsers = async () => {
         console.error('Error fetching users:', error)
     } finally {
         loading.value = false
+    }
+}
+
+const handleCreateUser = async () => {
+    const { valid } = await createForm.value.validate()
+    if (!valid) return
+
+    try {
+        const res = await axios.post('http://localhost:5000/users', newUser.value)
+        console.log('res created', res);
+        showCreateDialog.value = false
+        newUser.value = {
+            username: '',
+            password: '',
+            roles: [],
+            preferences: { timezone: '' },
+            active: true
+        }
+        await fetchUsers() // Refresh the list
+    } catch (error) {
+        console.error('Error creating user:', error)
+        alert('Error creating user: ' + error.response?.data?.error || error.message)
     }
 }
 
