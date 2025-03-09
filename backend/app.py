@@ -46,14 +46,31 @@ def get_user(user_id):
 @app.route("/users", methods=["POST"])
 def create_user():
     data = request.get_json()
-    # Set timestamps for created and updated times
+    
+    # Validate required fields
+    if not data.get('username') or not data.get('password'):
+        return jsonify({"error": "Username and password are required"}), 400
+        
+    # Validate roles
+    valid_roles = {'admin', 'manager', 'tester'}
+    if any(role not in valid_roles for role in data.get('roles', [])):
+        return jsonify({"error": "Invalid role specified"}), 400
+
+    # Set timestamps
     now = datetime.datetime.utcnow().timestamp()
     data["created_ts"] = now
     data["last_updated_ts"] = now
-    result = users_collection.insert_one(data)
-    new_user = users_collection.find_one({"_id": result.inserted_id})
-    new_user["_id"] = str(new_user["_id"])
-    return jsonify(new_user), 201
+    
+    # Ensure preferences structure
+    data.setdefault('preferences', {'timezone': 'UTC'})
+    
+    try:
+        result = users_collection.insert_one(data)
+        new_user = users_collection.find_one({"_id": result.inserted_id})
+        new_user["_id"] = str(new_user["_id"])
+        return jsonify(new_user), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/users/<user_id>", methods=["PUT"])
 def update_user(user_id):
