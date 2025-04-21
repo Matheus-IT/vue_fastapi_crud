@@ -61,6 +61,8 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import UserFormDialog from '@/components/UserFormDialog.vue'
 
+const host = 'http://localhost:8000';
+
 const formatDateTime = (dateTimeString) => {
   const date = new Date(dateTimeString);
   return date.toLocaleString('en-US', {
@@ -114,10 +116,10 @@ const handleFormSubmit = async (formData) => {
 
         if (isEditMode.value) {
             console.log('Updating user:', formData)
-            await axios.put(`http://localhost:5000/users/${selectedUser.value._id}`, payload)
+            await axios.put(`${host}/users/${selectedUser.value._id}`, payload)
         } else {
             console.log('Creating user:', payload)
-            await axios.post('http://localhost:5000/users', payload)
+            await axios.post(`${host}/users`, payload)
         }
         showUserDialog.value = false
         await fetchUsers() // Refresh the list
@@ -129,8 +131,7 @@ const handleFormSubmit = async (formData) => {
 
 const fetchUsers = async () => {
     try {
-        const response = await axios.get('http://localhost:5000/users')
-        console.log('Fetched users:', response.data)
+        const response = await axios.get(`${host}/users`)
         users.value = response.data
     } catch (error) {
         console.error('Error fetching users:', error)
@@ -144,7 +145,7 @@ const deleteUser = async (user) => {
     if (!confirmDelete) return
 
     try {
-        await axios.delete(`http://localhost:5000/users/${user._id}`)
+        await axios.delete(`${host}/users/${user._id}`)
         users.value = users.value.filter(u => u._id !== user._id)
         alert('User deleted successfully')
     } catch (error) {

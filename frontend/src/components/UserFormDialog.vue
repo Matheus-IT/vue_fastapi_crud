@@ -49,8 +49,6 @@ const props = defineProps({
 
 const emit = defineEmits(['submit', 'update:dialog'])
 
-console.log('UserFormDialog props:', props)
-
 const form = ref(null)
 const formData = ref({
     username: '',
