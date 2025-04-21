@@ -1,38 +1,32 @@
 from fastapi import FastAPI
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+from motor.motor_asyncio import AsyncIOMotorClient
 import datetime
+from models import UserDB, UserPublic
 import os
 
 app = FastAPI()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017/")
-client = MongoClient(MONGO_URI)
-print('client', client)
+
+client = AsyncIOMotorClient("mongodb://mongo:27017")
 db = client["mydatabase"]
 print('db', db)
 users_collection = db["users"]
 print('users_collection', users_collection)
 
-def convert_timestamps_to_iso(user):
-    from datetime import datetime
-    user['created_at'] = datetime.fromtimestamp(user['created_ts']).isoformat()
-    user['last_updated'] = datetime.fromtimestamp(user.get('updated_ts', user['created_ts'])).isoformat()
-    return user
-
 
 @app.get("/")
-def home():
+def health_check():
     return {'message': 'Backend is working!'}
 
-# @app.route("/users", methods=["GET"])
-# def get_users():
-#     users = []
-#     for user in users_collection.find():
-#         user["_id"] = str(user["_id"])
-#         user = convert_timestamps_to_iso(user)
-#         users.append(user)
-#     return jsonify(users), 200
+@app.get("/users", response_model=list[UserPublic])
+async def get_users():
+    users = []
+    async for user in users_collection.find():
+        user["_id"] = str(user["_id"])
+        users.append(user)
+    return users
 
 # @app.route("/users", methods=["POST"])
 # def create_user():
