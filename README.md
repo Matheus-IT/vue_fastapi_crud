@@ -31,8 +31,8 @@ Follow these steps to set up and run the application:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Matheus-IT/vue_flask_crud.git
-cd vue_flask_crud
+git clone https://github.com/Matheus-IT/vue_fastapi_crud.git
+cd vue_fastapi_crud
 ```
 
 ### 2. Build and Run the Application
