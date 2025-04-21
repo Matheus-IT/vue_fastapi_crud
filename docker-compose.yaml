@@ -22,11 +22,11 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.backend
-    container_name: flask-api
+    container_name: fastapi
     environment:
       - MONGO_URI=mongodb://mongo:27017/mydatabase
     ports:
-      - "5000:5000"
+      - "8000:8000"
     depends_on:
       - mongo
     volumes:
