@@ -1,6 +1,6 @@
-# Vue + Flask CRUD Application
+# Vue + Fastapi CRUD Application
 
-A full-stack application built with **Vue.js** (frontend) and **Flask** (backend) to demonstrate CRUD (Create, Read, Update, Delete) operations for managing users. The application is containerized using **Docker** for easy setup and deployment.
+A full-stack application built with **Vue.js** (frontend) and **Fastapi** (backend) to demonstrate CRUD (Create, Read, Update, Delete) operations for managing users. The application is containerized using **Docker** for easy setup and deployment.
 
 ---
 
@@ -49,7 +49,7 @@ docker compose up
 Once the containers are running, open your browser and navigate to:
 
 - **Frontend (Vue.js)**: [http://localhost:5173](http://localhost:5173)
-- **Backend (Flask API)**: [http://localhost:5000](http://localhost:5000)
+- **Backend (Fastapi API)**: [http://localhost:8000](http://localhost:8000)
 
 ---
 
@@ -60,11 +60,11 @@ Once the containers are running, open your browser and navigate to:
 - **Vue 3**: Frontend framework.
 - **Vuetify**: UI component library for a Material Design look.
 - **Vue Router**: Handles client-side routing.
-- **Axios**: For making HTTP requests to the Flask backend.
+- **Axios**: For making HTTP requests to the Fastapi backend.
 
-### Backend (Flask)
+### Backend (Fastapi)
 
-- **Flask**: Python web framework for the backend API.
+- **Fastapi**: Python web framework for the backend API.
 - **MongoDB**: Database for storing user data.
 
 ### Docker
@@ -72,14 +72,14 @@ Once the containers are running, open your browser and navigate to:
 - **Docker Compose**: Manages multi-container Docker applications.
 - **Services**:
   - `frontend`: Vue.js application.
-  - `backend`: Flask API.
+  - `backend`: Fastapi API.
   - `mongo`: MongoDB database.
   - `importer`: Script to populate the database.
 ---
 
 ## API Endpoints
 
-The Flask backend exposes the following RESTful API endpoints:
+The Fastapi backend exposes the following RESTful API endpoints:
 
 | Method | Endpoint           | Description                     |
 |--------|--------------------|---------------------------------|
@@ -108,7 +108,7 @@ This will stop and remove the containers.
 ### Common Issues
 
 1. **Port Conflicts**:
-   - Ensure ports `5173` (frontend) and `5000` (backend) are not in use by other applications.
+   - Ensure ports `5173` (frontend) and `8000` (backend) are not in use by other applications.
 
 2. **Docker Build Failures**:
    - Ensure Docker and Docker Compose are installed correctly.
