@@ -16,6 +16,7 @@ class User:
     preferences: UserPreferences
     active: bool = True
     created_ts: float = None
+    last_updated_ts: float = None
 
 def parse_roles(user_data):
     roles = []
@@ -43,7 +44,8 @@ def load_users_from_json(file_path):
             roles=roles,
             preferences=preferences,
             active=u.get('is_user_active', True),
-            created_ts=created_ts
+            created_ts=created_ts,
+            last_updated_ts=created_ts,
         )
         users.append(user)
     return users
@@ -66,6 +68,7 @@ def insert_users_into_db(users):
             "preferences": {"timezone": user.preferences.timezone},
             "active": user.active,
             "created_ts": user.created_ts,
+            "last_updated_ts": user.last_updated_ts,
         }
         users_collection.insert_one(user_document)
         print(f"Inserted user: {user.username}")

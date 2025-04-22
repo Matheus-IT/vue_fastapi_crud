@@ -1,11 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
-from bson.objectid import ObjectId
-from motor.motor_asyncio import AsyncIOMotorClient
-import datetime
-from models import UserDB, UserPublic
-import os
+from app.database import get_users_collection
+from app.models import UserPublic
 
 app = FastAPI()
 
@@ -21,53 +17,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = AsyncIOMotorClient("mongodb://mongo:27017")
-db = client["mydatabase"]
-print('db', db)
-users_collection = db["users"]
-print('users_collection', users_collection)
-
 
 @app.get("/")
 def health_check():
     return {'message': 'Backend is working!'}
 
 @app.get("/users", response_model=list[UserPublic])
-async def get_users():
+async def get_users(users_collection=Depends(get_users_collection)):
     users = []
     async for user in users_collection.find():
         user["_id"] = str(user["_id"])
         users.append(user)
     return users
 
-# @app.route("/users", methods=["POST"])
-# def create_user():
-#     data = request.get_json()
-    
-#     # Validate required fields
-#     if not data.get('username') or not data.get('password'):
-#         return jsonify({"error": "Username and password are required"}), 400
-        
-#     # Validate roles
-#     valid_roles = {'admin', 'manager', 'tester'}
-#     if any(role not in valid_roles for role in data.get('roles', [])):
-#         return jsonify({"error": "Invalid role specified"}), 400
+# @app.post("/users", response_model=UserPublic)
+# def create_user(user: UserDBCreate, users_collection=Depends(get_users_collection)):
+#     data = user.model_dump()
 
-#     # Set timestamps
-#     now = datetime.datetime.utcnow().timestamp()
-#     data["created_ts"] = now
-#     data["last_updated_ts"] = now
-    
-#     # Ensure preferences structure
-#     data.setdefault('preferences', {'timezone': 'UTC'})
+#     # convert to timestamps for db
+#     data['created_at'] = data['created_at'].timestamp()
+#     data['last_updated_at'] = data['last_updated_at'].timestamp()
+#     print('data', data)
     
 #     try:
 #         result = users_collection.insert_one(data)
 #         new_user = users_collection.find_one({"_id": result.inserted_id})
 #         new_user["_id"] = str(new_user["_id"])
-#         return jsonify(new_user), 201
+#         return new_user
 #     except Exception as e:
-#         return jsonify({"error": str(e)}), 400
+#         return {"error": str(e)}
 
 # @app.route("/users/<user_id>", methods=["GET"])
 # def get_user(user_id):
