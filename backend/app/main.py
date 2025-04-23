@@ -55,14 +55,21 @@ async def create_user(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# @app.route("/users/<user_id>", methods=["GET"])
-# def get_user(user_id):
-#     user = users_collection.find_one({"_id": ObjectId(user_id)})
-#     if user:
-#         user["_id"] = str(user["_id"])
-#         user = convert_timestamps_to_iso(user)
-#         return jsonify(user), 200
-#     return jsonify({"error": "User not found"}), 404
+@app.get("/users/{user_id}", response_model=UserPublic)
+async def get_user(
+    user_id: str,
+    users_collection: AsyncIOMotorCollection = Depends(get_users_collection),
+):
+    from bson import ObjectId
+
+    user = await users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        print("\nici!!!")
+        raise HTTPException(detail="User not found", status_code=404)
+
+    user["_id"] = str(user["_id"])
+    return user
+
 
 # @app.route("/users/<user_id>", methods=["PUT"])
 # def update_user(user_id):

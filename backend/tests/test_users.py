@@ -3,6 +3,7 @@ from datetime import datetime, UTC
 from unittest.mock import AsyncMock
 
 
+# testando rotas que retornam usuários ========================================
 @pytest.mark.anyio
 async def test_get_users_empty(async_client):
     response = await async_client.get("/users")
@@ -29,6 +30,7 @@ async def test_get_single_user(async_client, users_collection):
     assert data[0]["username"] == "tester"
 
 
+# testando a criação de usuários ==============================================
 @pytest.mark.anyio
 async def test_create_user(async_client, users_collection):
     payload = {
@@ -169,9 +171,6 @@ def override_users_collection_with_error(mock_users_collection_with_error):
 
 @pytest.mark.anyio
 async def test_create_user_db_error(async_client, override_users_collection_with_error):
-    from app.database import get_users_collection
-    from app.main import app
-
     payload = {
         "username": "db_error",
         "password": "123",
@@ -185,3 +184,32 @@ async def test_create_user_db_error(async_client, override_users_collection_with
     assert response.status_code == 500  # or another code if you prefer
     assert "detail" in data
     assert "Database error" in data["detail"]
+
+
+# testando retorno de único usuário ===========================================
+@pytest.mark.anyio
+async def test_get_user(async_client, users_collection):
+    # Inserir diretamente na collection de teste
+    await users_collection.insert_one(
+        {
+            "username": "tester",
+            "roles": ["tester"],
+            "preferences": {"timezone": "UTC"},
+            "active": True,
+            "created_ts": datetime.now(UTC).isoformat(),
+            "last_updated_ts": None,
+        }
+    )
+    tester_id = (await users_collection.find_one({"username": "tester"}))["_id"]
+    response = await async_client.get(f"/users/{tester_id}")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["username"] == "tester"
+
+
+@pytest.mark.anyio
+async def test_get_user_not_found(async_client, users_collection):
+    response = await async_client.get(f"/users/000000000000000000000000")
+    data = response.json()
+    assert response.status_code == 404
+    assert data["detail"] == "User not found"
