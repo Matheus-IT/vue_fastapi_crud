@@ -1,6 +1,7 @@
 import pytest
-from datetime import datetime, UTC
-from unittest.mock import AsyncMock
+from datetime import datetime, timezone, UTC
+from unittest.mock import AsyncMock, MagicMock
+from bson import ObjectId
 
 
 # testando rotas que retornam usuários ========================================
@@ -150,6 +151,9 @@ def mock_users_collection_with_error(mocker):
     mock_users_collection.insert_one = AsyncMock(
         side_effect=Exception("Database error")
     )
+    mock_users_collection.update_one = AsyncMock(
+        side_effect=Exception("Database error")
+    )
     return mock_users_collection
 
 
@@ -213,3 +217,118 @@ async def test_get_user_not_found(async_client, users_collection):
     data = response.json()
     assert response.status_code == 404
     assert data["detail"] == "User not found"
+
+
+# testando atualização de usuário ==========================================
+@pytest.mark.anyio
+async def test_update_user_success(
+    async_client,
+    mock_users_collection_with_error,
+    override_users_collection_with_error,
+):
+    # Arrange
+    user_id = ObjectId()
+    # Simulate update_one modified 1 doc
+    mock_users_collection_with_error.update_one = AsyncMock(
+        return_value=MagicMock(modified_count=1)
+    )
+    # Simulate fetching the updated doc
+    fake_doc = {
+        "_id": user_id,
+        "username": "bob",
+        "roles": ["tester"],
+        "preferences": {"timezone": "UTC"},
+        "active": False,
+        "created_at": datetime.now(timezone.utc),
+        "last_updated_at": None,
+    }
+    mock_users_collection_with_error.find_one = AsyncMock(return_value=fake_doc)
+
+    payload = {"username": "bob", "active": False}
+
+    # Act
+    response = await async_client.patch(f"/users/{user_id}", json=payload)
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 200
+    assert data["username"] == "bob"
+    assert data["active"] is False
+
+
+@pytest.mark.anyio
+async def test_update_user_not_found_valid_id(
+    async_client, mock_users_collection_with_error
+):
+    # Arrange: no document modified
+    mock_users_collection_with_error.update_one = AsyncMock(
+        return_value=MagicMock(modified_count=0)
+    )
+
+    # Act
+    response = await async_client.patch(
+        "/users/000000000000000000000000", json={"active": True}
+    )
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 404
+    assert data == {"detail": "User not found"}
+
+
+@pytest.mark.anyio
+async def test_update_user_malformed_id(async_client):
+    # Act
+    response = await async_client.patch("/users/invalid-id-123", json={"active": True})
+
+    # Assert
+    assert response.status_code == 404
+    assert response.json() == {"detail": "User not found"}
+
+
+@pytest.mark.anyio
+async def test_update_user_no_fields(async_client):
+    # Act: empty body
+    response = await async_client.patch(f"/users/{ObjectId()}", json={})
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 422
+    assert "No fields provided to update" in data["detail"]
+
+
+@pytest.mark.anyio
+async def test_update_user_db_error(
+    async_client, users_collection, override_users_collection_with_error
+):
+    await users_collection.insert_one(
+        {
+            "username": "tester",
+            "roles": ["tester"],
+            "preferences": {"timezone": "UTC"},
+            "active": True,
+            "created_ts": datetime.now(UTC).isoformat(),
+            "last_updated_ts": None,
+        }
+    )
+    tester_id = (await users_collection.find_one({"username": "tester"}))["_id"]
+    # Act
+    response = await async_client.patch(f"/users/{tester_id}", json={"active": True})
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 500
+    assert data["detail"] == "Database error"
+
+
+@pytest.mark.anyio
+async def test_update_user_invalid_roles_type(async_client):
+    # Act: roles must be list
+    payload = {"roles": "not-a-list"}
+    response = await async_client.patch(f"/users/{ObjectId()}", json=payload)
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 422
+    # Pydantic list_type error
+    assert data["detail"][0]["type"] == "list_type"

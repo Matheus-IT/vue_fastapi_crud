@@ -48,6 +48,21 @@ class UserDBCreate(BaseModel):
     )
 
 
+class UserUpdate(BaseModel):
+    username: str | None = None
+    roles: list[RoleType] | None = None
+    preferences: UserPreferences | None = None
+    active: bool | None = None
+    created_at: datetime | None = Field(
+        None, serialization_alias="created_at", validation_alias="created_ts"
+    )
+    last_updated_at: datetime | None = Field(
+        None, serialization_alias="last_updated_at", validation_alias="created_ts"
+    )
+
+    model_config = {"validate_by_name": True}
+
+
 class UserDB(UserPublic):
     id: str = Field(
         serialization_alias="_id", validation_alias="id"

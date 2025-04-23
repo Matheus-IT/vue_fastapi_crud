@@ -1,8 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import get_users_collection
-from app.models import UserPublic, UserDBCreate
+from app.models import UserPublic, UserDBCreate, UserUpdate
 from motor.motor_asyncio import AsyncIOMotorCollection
+from bson import ObjectId
+from bson.errors import InvalidId
+from datetime import datetime
 
 app = FastAPI()
 
@@ -60,8 +63,6 @@ async def get_user(
     user_id: str,
     users_collection: AsyncIOMotorCollection = Depends(get_users_collection),
 ):
-    from bson import ObjectId
-
     user = await users_collection.find_one({"_id": ObjectId(user_id)})
     if not user:
         print("\nici!!!")
@@ -71,20 +72,45 @@ async def get_user(
     return user
 
 
-# @app.route("/users/<user_id>", methods=["PUT"])
-# def update_user(user_id):
-#     data = request.get_json()
-#     data["last_updated_ts"] = datetime.datetime.utcnow().timestamp()
-#     result = users_collection.update_one(
-#         {"_id": ObjectId(user_id)},
-#         {"$set": data}
-#     )
-#     if result.modified_count:
-#         updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
-#         updated_user["_id"] = str(updated_user["_id"])
-#         updated_user = convert_timestamps_to_iso(updated_user)
-#         return jsonify(updated_user), 200
-#     return jsonify({"error": "User not found or no changes made"}), 404
+@app.patch("/users/{user_id}", response_model=UserPublic)
+async def update_user(
+    user_id: str,
+    update: UserUpdate,
+    users_collection: AsyncIOMotorCollection = Depends(get_users_collection),
+):
+    # 1. Validate ObjectId
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        raise HTTPException(
+            status_code=404, detail="User not found"
+        )  # malformed IDs → 404
+
+    # 2. Build update dict, excluding None
+    data = update.model_dump(exclude_none=True)
+    # Convert datetime fields to timestamps
+    for dt_field in ("created_at", "last_updated_at"):
+        if dt_field in data and isinstance(data[dt_field], datetime):
+            data[dt_field] = data[dt_field].timestamp()
+
+    if not data:
+        raise HTTPException(status_code=422, detail="No fields provided to update")
+
+    # 3. Perform the update
+    try:
+        result = await users_collection.update_one({"_id": oid}, {"$set": data})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # 4. Handle “not found”
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 5. Return the fresh document
+    user = await users_collection.find_one({"_id": oid})
+    user["_id"] = str(user["_id"])
+    return user
+
 
 # @app.route("/users/<user_id>", methods=["DELETE"])
 # def delete_user(user_id):
