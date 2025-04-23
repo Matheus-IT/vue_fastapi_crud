@@ -143,38 +143,25 @@ async def test_create_user_missing_username(async_client):
 
 
 @pytest.fixture
-def mock_users_collection_with_error(mocker):
+def mock_users_collection(mocker):
     """
-    Fixture to mock the users_collection with an insert_one method that raises an exception.
-    """
-    mock_users_collection = mocker.MagicMock()
-    mock_users_collection.insert_one = AsyncMock(
-        side_effect=Exception("Database error")
-    )
-    mock_users_collection.update_one = AsyncMock(
-        side_effect=Exception("Database error")
-    )
-    return mock_users_collection
-
-
-@pytest.fixture
-def override_users_collection_with_error(mock_users_collection_with_error):
-    """
-    Before the test: override get_users_collection → mock that always errors.
-    After the test: clear all overrides.
+    Fixture to mock the users_collection and override the dependency.
     """
     from app.database import get_users_collection
     from app.main import app
 
-    app.dependency_overrides[get_users_collection] = (
-        lambda: mock_users_collection_with_error
-    )
-    yield
+    mock_users_collection = mocker.MagicMock()
+
+    app.dependency_overrides[get_users_collection] = lambda: mock_users_collection
+    yield mock_users_collection
     app.dependency_overrides.clear()
 
 
 @pytest.mark.anyio
-async def test_create_user_db_error(async_client, override_users_collection_with_error):
+async def test_create_user_db_error(async_client, mock_users_collection):
+    mock_users_collection.insert_one = AsyncMock(
+        side_effect=Exception("Database error")
+    )
     payload = {
         "username": "db_error",
         "password": "123",
@@ -185,7 +172,7 @@ async def test_create_user_db_error(async_client, override_users_collection_with
     response = await async_client.post("/users", json=payload)
     data = response.json()
 
-    assert response.status_code == 500  # or another code if you prefer
+    assert response.status_code == 500
     assert "detail" in data
     assert "Database error" in data["detail"]
 
@@ -223,13 +210,12 @@ async def test_get_user_not_found(async_client, users_collection):
 @pytest.mark.anyio
 async def test_update_user_success(
     async_client,
-    mock_users_collection_with_error,
-    override_users_collection_with_error,
+    mock_users_collection,
 ):
     # Arrange
     user_id = ObjectId()
     # Simulate update_one modified 1 doc
-    mock_users_collection_with_error.update_one = AsyncMock(
+    mock_users_collection.update_one = AsyncMock(
         return_value=MagicMock(modified_count=1)
     )
     # Simulate fetching the updated doc
@@ -242,7 +228,7 @@ async def test_update_user_success(
         "created_at": datetime.now(timezone.utc),
         "last_updated_at": None,
     }
-    mock_users_collection_with_error.find_one = AsyncMock(return_value=fake_doc)
+    mock_users_collection.find_one = AsyncMock(return_value=fake_doc)
 
     payload = {"username": "bob", "active": False}
 
@@ -257,11 +243,9 @@ async def test_update_user_success(
 
 
 @pytest.mark.anyio
-async def test_update_user_not_found_valid_id(
-    async_client, mock_users_collection_with_error
-):
+async def test_update_user_not_found_valid_id(async_client, mock_users_collection):
     # Arrange: no document modified
-    mock_users_collection_with_error.update_one = AsyncMock(
+    mock_users_collection.update_one = AsyncMock(
         return_value=MagicMock(modified_count=0)
     )
 
@@ -298,22 +282,12 @@ async def test_update_user_no_fields(async_client):
 
 
 @pytest.mark.anyio
-async def test_update_user_db_error(
-    async_client, users_collection, override_users_collection_with_error
-):
-    await users_collection.insert_one(
-        {
-            "username": "tester",
-            "roles": ["tester"],
-            "preferences": {"timezone": "UTC"},
-            "active": True,
-            "created_ts": datetime.now(UTC).isoformat(),
-            "last_updated_ts": None,
-        }
+async def test_update_user_db_error(async_client, mock_users_collection):
+    mock_users_collection.update_one = AsyncMock(
+        side_effect=Exception("Database error")
     )
-    tester_id = (await users_collection.find_one({"username": "tester"}))["_id"]
     # Act
-    response = await async_client.patch(f"/users/{tester_id}", json={"active": True})
+    response = await async_client.patch(f"/users/{ObjectId()}", json={"active": True})
     data = response.json()
 
     # Assert
@@ -337,10 +311,11 @@ async def test_update_user_invalid_roles_type(async_client):
 # testando exclusão de usuário ==========================================
 @pytest.mark.anyio
 async def test_delete_user_success(
-    async_client, mock_users_collection_with_error, override_users_collection_with_error
+    async_client,
+    mock_users_collection,
 ):
     # Arrange: delete_one returns a SimpleNamespace with deleted_count=1
-    mock_users_collection_with_error.delete_one = AsyncMock(
+    mock_users_collection.delete_one = AsyncMock(
         return_value=MagicMock(deleted_count=1)
     )
 
@@ -376,10 +351,11 @@ async def test_delete_user_malformed_id(async_client):
 
 @pytest.mark.anyio
 async def test_delete_user_db_error(
-    async_client, mock_users_collection_with_error, override_users_collection_with_error
+    async_client,
+    mock_users_collection,
 ):
     # Arrange: simulate a database exception
-    mock_users_collection_with_error.delete_one = AsyncMock(
+    mock_users_collection.delete_one = AsyncMock(
         side_effect=Exception("Database error")
     )
 
