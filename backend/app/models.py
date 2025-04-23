@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Literal
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 RoleType = Literal["admin", "manager", "tester"]
@@ -27,14 +27,19 @@ class UserPublic(BaseModel):
         validation_alias="last_updated_ts",
     )
 
+    model_config = {"validate_by_name": True}
+
 
 class UserDBCreate(BaseModel):
     username: str
+    password: str
     roles: list[RoleType]
     preferences: UserPreferences
     active: bool = True
     created_at: datetime = Field(
-        serialization_alias="created_ts", validation_alias="created_at"
+        default_factory=lambda: datetime.now(timezone.utc),
+        serialization_alias="created_ts",
+        validation_alias="created_at",
     )
     last_updated_at: datetime | None = Field(
         default=None,

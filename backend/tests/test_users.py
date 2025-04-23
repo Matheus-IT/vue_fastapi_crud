@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, UTC
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.anyio
@@ -10,7 +11,7 @@ async def test_get_users_empty(async_client):
 
 
 @pytest.mark.anyio
-async def test_create_and_get_user(async_client, users_collection):
+async def test_get_single_user(async_client, users_collection):
     # Inserir diretamente na collection de teste
     await users_collection.insert_one(
         {
@@ -18,7 +19,7 @@ async def test_create_and_get_user(async_client, users_collection):
             "roles": ["tester"],
             "preferences": {"timezone": "UTC"},
             "active": True,
-            "created_ts": datetime.now(UTC),
+            "created_ts": datetime.now(UTC).isoformat(),
             "last_updated_ts": None,
         }
     )
@@ -26,3 +27,161 @@ async def test_create_and_get_user(async_client, users_collection):
     data = response.json()
     assert len(data) == 1
     assert data[0]["username"] == "tester"
+
+
+@pytest.mark.anyio
+async def test_create_user(async_client, users_collection):
+    payload = {
+        "username": "tester",
+        "password": "123",
+        "roles": ["tester"],
+        "preferences": {"timezone": "UTC"},
+        "active": True,
+        "created_ts": datetime.now(UTC).isoformat(),
+        "last_updated_ts": None,
+    }
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+    assert data["username"] == "tester"
+
+
+@pytest.mark.anyio
+async def test_create_user_last_updated_at_none(async_client):
+    payload = {
+        "username": "withnone",
+        "password": "123",
+        "roles": ["tester"],
+        "preferences": {"timezone": "UTC"},
+        "last_updated_at": None,
+    }
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+    assert response.status_code == 200
+    assert data["last_updated_at"] is None
+
+
+@pytest.mark.anyio
+async def test_create_user_with_min_params(async_client, users_collection):
+    """
+    Testa a criação de um usuário com os parâmetros mínimos necessários.
+    """
+    payload = {
+        "username": "tester",
+        "password": "123",
+        "roles": ["tester"],
+        "preferences": {"timezone": "UTC"},
+    }
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+    assert data["username"] == "tester"
+    assert data["active"] is True
+    assert data["created_at"] is not None
+    assert data["last_updated_at"] is None
+
+
+@pytest.mark.anyio
+async def test_create_user_with_all_fields(async_client, users_collection):
+    payload = {
+        "username": "fulluser",
+        "password": "123",
+        "roles": ["admin", "manager"],
+        "preferences": {"timezone": "America/Sao_Paulo"},
+        "active": False,
+        "last_updated_at": "2024-01-01T12:00:00Z",
+    }
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["username"] == "fulluser"
+    assert data["active"] is False
+    assert data["roles"] == ["admin", "manager"]
+    assert data["preferences"]["timezone"] == "America/Sao_Paulo"
+    assert data["last_updated_at"] is not None
+
+
+@pytest.mark.anyio
+async def test_create_user_invalid_datetime(async_client):
+    payload = {
+        "username": "badtime",
+        "password": "123",
+        "roles": ["tester"],
+        "preferences": {"timezone": "UTC"},
+        "last_updated_at": "not-a-datetime",
+    }
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+    assert response.status_code == 422
+    assert data["detail"][0]["type"] == "datetime_from_date_parsing"
+
+
+@pytest.mark.anyio
+async def test_create_user_with_invalid_roles(async_client):
+    payload = {
+        "username": "invalid_roles",
+        "password": "123",
+        "roles": "admin",  # Should be a list!
+        "preferences": {"timezone": "UTC"},
+    }
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+    assert response.status_code == 422
+    assert data["detail"][0]["type"] == "list_type"
+
+
+@pytest.mark.anyio
+async def test_create_user_missing_username(async_client):
+    payload = {
+        "roles": ["viewer"],
+        "preferences": {"timezone": "UTC"},
+    }
+    response = await async_client.post("/users", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.fixture
+def mock_users_collection_with_error(mocker):
+    """
+    Fixture to mock the users_collection with an insert_one method that raises an exception.
+    """
+    mock_users_collection = mocker.MagicMock()
+    mock_users_collection.insert_one = AsyncMock(
+        side_effect=Exception("Database error")
+    )
+    return mock_users_collection
+
+
+@pytest.fixture
+def override_users_collection_with_error(mock_users_collection_with_error):
+    """
+    Before the test: override get_users_collection → mock that always errors.
+    After the test: clear all overrides.
+    """
+    from app.database import get_users_collection
+    from app.main import app
+
+    app.dependency_overrides[get_users_collection] = (
+        lambda: mock_users_collection_with_error
+    )
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.anyio
+async def test_create_user_db_error(async_client, override_users_collection_with_error):
+    from app.database import get_users_collection
+    from app.main import app
+
+    payload = {
+        "username": "db_error",
+        "password": "123",
+        "roles": ["admin"],
+        "preferences": {"timezone": "UTC"},
+    }
+
+    response = await async_client.post("/users", json=payload)
+    data = response.json()
+
+    assert response.status_code == 500  # or another code if you prefer
+    assert "detail" in data
+    assert "Database error" in data["detail"]

@@ -1,5 +1,4 @@
 import pytest
-from motor.motor_asyncio import AsyncIOMotorClient
 from mongomock_motor import AsyncMongoMockClient
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
@@ -29,15 +28,19 @@ def mock_mongo_client(monkeypatch):
 
 
 @pytest.fixture
-async def users_collection(mock_mongo_client):
+async def users_collection(mock_mongo_client: AsyncMongoMockClient):
     """Fixture para collection de usuários usando o mock"""
     db = mock_mongo_client["test_database"]
-    return db["users"]
+    yield db["users"]
+    await db["users"].delete_many({})
 
-# 5) Override das dependências no app
+
 @pytest.fixture(autouse=True)
 def override_dependencies(mock_mongo_client):
+    """Override das dependências no app"""
     app.dependency_overrides[get_mongo_client] = lambda: mock_mongo_client
-    app.dependency_overrides[get_users_collection] = lambda: mock_mongo_client["test_database"]["users"]
+    app.dependency_overrides[get_users_collection] = lambda: mock_mongo_client[
+        "test_database"
+    ]["users"]
     yield
     app.dependency_overrides.clear()

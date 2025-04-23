@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import get_users_collection
-from app.models import UserPublic
+from app.models import UserPublic, UserDBCreate
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 app = FastAPI()
 
@@ -20,7 +21,8 @@ app.add_middleware(
 
 @app.get("/")
 def health_check():
-    return {'message': 'Backend is working!'}
+    return {"message": "Backend is working!"}
+
 
 @app.get("/users", response_model=list[UserPublic])
 async def get_users(users_collection=Depends(get_users_collection)):
@@ -30,22 +32,28 @@ async def get_users(users_collection=Depends(get_users_collection)):
         users.append(user)
     return users
 
-# @app.post("/users", response_model=UserPublic)
-# def create_user(user: UserDBCreate, users_collection=Depends(get_users_collection)):
-#     data = user.model_dump()
 
-#     # convert to timestamps for db
-#     data['created_at'] = data['created_at'].timestamp()
-#     data['last_updated_at'] = data['last_updated_at'].timestamp()
-#     print('data', data)
-    
-#     try:
-#         result = users_collection.insert_one(data)
-#         new_user = users_collection.find_one({"_id": result.inserted_id})
-#         new_user["_id"] = str(new_user["_id"])
-#         return new_user
-#     except Exception as e:
-#         return {"error": str(e)}
+@app.post("/users", response_model=UserPublic)
+async def create_user(
+    user: UserDBCreate,
+    users_collection: AsyncIOMotorCollection = Depends(get_users_collection),
+):
+    data = user.model_dump()
+
+    # convert to timestamps for db
+    data["created_at"] = data["created_at"].timestamp()
+    if data["last_updated_at"]:
+        data["last_updated_at"] = data["last_updated_at"].timestamp()
+    print("data", data)
+
+    try:
+        result = await users_collection.insert_one(data)
+        new_user = await users_collection.find_one({"_id": result.inserted_id})
+        new_user["_id"] = str(new_user["_id"])
+        return new_user
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # @app.route("/users/<user_id>", methods=["GET"])
 # def get_user(user_id):
@@ -77,5 +85,3 @@ async def get_users(users_collection=Depends(get_users_collection)):
 #     if result.deleted_count:
 #         return jsonify({"message": "User deleted"}), 200
 #     return jsonify({"error": "User not found"}), 404
-
-
