@@ -78,7 +78,6 @@ async def update_user(
     update: UserUpdate,
     users_collection: AsyncIOMotorCollection = Depends(get_users_collection),
 ):
-    # 1. Validate ObjectId
     try:
         oid = ObjectId(user_id)
     except InvalidId:
@@ -86,7 +85,7 @@ async def update_user(
             status_code=404, detail="User not found"
         )  # malformed IDs → 404
 
-    # 2. Build update dict, excluding None
+    # Build update dict, excluding values that were not provided
     data = update.model_dump(exclude_none=True)
     # Convert datetime fields to timestamps
     for dt_field in ("created_at", "last_updated_at"):
@@ -96,25 +95,37 @@ async def update_user(
     if not data:
         raise HTTPException(status_code=422, detail="No fields provided to update")
 
-    # 3. Perform the update
     try:
         result = await users_collection.update_one({"_id": oid}, {"$set": data})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # 4. Handle “not found”
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 5. Return the fresh document
     user = await users_collection.find_one({"_id": oid})
     user["_id"] = str(user["_id"])
     return user
 
 
-# @app.route("/users/<user_id>", methods=["DELETE"])
-# def delete_user(user_id):
-#     result = users_collection.delete_one({"_id": ObjectId(user_id)})
-#     if result.deleted_count:
-#         return jsonify({"message": "User deleted"}), 200
-#     return jsonify({"error": "User not found"}), 404
+@app.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: str,
+    users_collection: AsyncIOMotorCollection = Depends(get_users_collection),
+):
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        # malformed ID → not found
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        result = await users_collection.delete_one({"_id": oid})
+    except Exception as e:
+        # database failure → 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return

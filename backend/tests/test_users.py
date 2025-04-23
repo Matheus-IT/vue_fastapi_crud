@@ -332,3 +332,61 @@ async def test_update_user_invalid_roles_type(async_client):
     assert response.status_code == 422
     # Pydantic list_type error
     assert data["detail"][0]["type"] == "list_type"
+
+
+# testando exclusão de usuário ==========================================
+@pytest.mark.anyio
+async def test_delete_user_success(
+    async_client, mock_users_collection_with_error, override_users_collection_with_error
+):
+    # Arrange: delete_one returns a SimpleNamespace with deleted_count=1
+    mock_users_collection_with_error.delete_one = AsyncMock(
+        return_value=MagicMock(deleted_count=1)
+    )
+
+    # Act
+    user_id = ObjectId()
+    response = await async_client.delete(f"/users/{user_id}")
+
+    # Assert
+    assert response.status_code == 204  # No Content
+
+
+@pytest.mark.anyio
+async def test_delete_user_not_found_valid_id(async_client):
+    # Act
+    response = await async_client.delete("/users/000000000000000000000000")
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 404
+    assert data == {"detail": "User not found"}
+
+
+@pytest.mark.anyio
+async def test_delete_user_malformed_id(async_client):
+    # Act: pass a non-hex string
+    response = await async_client.delete("/users/invalid-id-123")
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 404
+    assert data == {"detail": "User not found"}
+
+
+@pytest.mark.anyio
+async def test_delete_user_db_error(
+    async_client, mock_users_collection_with_error, override_users_collection_with_error
+):
+    # Arrange: simulate a database exception
+    mock_users_collection_with_error.delete_one = AsyncMock(
+        side_effect=Exception("Database error")
+    )
+
+    # Act
+    response = await async_client.delete(f"/users/{ObjectId()}")
+    data = response.json()
+
+    # Assert
+    assert response.status_code == 500
+    assert data["detail"] == "Database error"
